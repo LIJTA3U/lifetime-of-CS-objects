@@ -44,12 +44,10 @@ class Program
         Console.WriteLine($"Total allocated (approx): {ThreadCount * ObjectsPerThread * ObjectSize / 1024.0 / 1024:F2} MB");
         Console.WriteLine();
 
-        // Warm-up: принудительная полная сборка, чтобы стартовые счётчики были чистыми
         GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
         GC.WaitForPendingFinalizers();
         GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
 
-        // Запись счётчиков до начала
         int gen0Before = GC.CollectionCount(0);
         int gen1Before = GC.CollectionCount(1);
         int gen2Before = GC.CollectionCount(2);
@@ -57,7 +55,6 @@ class Program
 
         var sw = Stopwatch.StartNew();
 
-        // Четыре параллельных потока через Task.Run
         var tasks = new Task[ThreadCount];
         for (int i = 0; i < ThreadCount; i++)
         {
@@ -77,7 +74,6 @@ class Program
 
         sw.Stop();
 
-        // Запись счётчиков после завершения всех потоков
         int gen0After = GC.CollectionCount(0);
         int gen1After = GC.CollectionCount(1);
         int gen2After = GC.CollectionCount(2);

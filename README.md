@@ -155,153 +155,9 @@ dotnet build src/MemoryLifecycle/MemoryLifecycle.csproj -c Release
 
 ### Шаг 2. Запуск в режиме Workstation GC (по умолчанию)
 
-Выполните:
-
-```powershell
-dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
-```
-
-**Пример вывода, который вы должны увидеть:**
-
-```
-=== GC Benchmark ===
-GCSettings.IsServerGC = False
-Processor count: 12
-Threads: 4
-Objects per thread: 300,000
-Object size: 100 bytes
-Total allocated (approx): 114,44 MB
-
-  Thread 3 finished
-  Thread 1 finished
-  Thread 0 finished
-  Thread 2 finished
-
-=== Results ===
-GCSettings.IsServerGC = False
-Elapsed time: 18 ms
-Gen0 collections: 16
-Gen1 collections: 0
-Gen2 collections: 0
-Total allocated bytes: 146,00 MB
-```
-
-**Запишите в таблицу:**
-- `GCSettings.IsServerGC` — должно быть `False`
-- `Elapsed time` — время выполнения в мс
-- `Gen0 collections`, `Gen1 collections`, `Gen2 collections`
-- `Total allocated bytes`
-
-**Повторите запуск 2–3 раза**, чтобы убедиться, что результаты стабильны (время может немного плавать, но Gen0 должен оставаться около 16).
-
 ---
 
-### Шаг 3. Запуск в режиме Server GC
-
-Есть два способа переключить проект на Server GC. Выберите любой один.
-
-#### Способ А — через файл проекта `.csproj` (рекомендуется для отчёта)
-
-1. Откройте файл `src/MemoryLifecycle/MemoryLifecycle.csproj` в любом текстовом редакторе (Блокнот, VS Code, Visual Studio).
-
-2. Найдите блок `<PropertyGroup>` и добавьте в него строку:
-
-   ```xml
-   <PropertyGroup>
-     <OutputType>Exe</OutputType>
-     <TargetFramework>net9.0</TargetFramework>
-     <ImplicitUsings>enable</ImplicitUsings>
-     <Nullable>enable</Nullable>
-     <ServerGarbageCollection>true</ServerGarbageCollection>
-   </PropertyGroup>
-   ```
-
-3. Сохраните файл.
-
-4. Пересоберите проект:
-   ```powershell
-   dotnet build src/MemoryLifecycle/MemoryLifecycle.csproj -c Release
-   ```
-
-5. Запустите:
-   ```powershell
-   dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
-   ```
-
-**Пример вывода (Server GC):**
-
-```
-=== GC Benchmark ===
-GCSettings.IsServerGC = True
-Processor count: 12
-Threads: 4
-Objects per thread: 300,000
-Object size: 100 bytes
-Total allocated (approx): 114,44 MB
-
-  Thread 2 finished
-  Thread 0 finished
-  Thread 3 finished
-  Thread 1 finished
-
-=== Results ===
-GCSettings.IsServerGC = True
-Elapsed time: 12 ms
-Gen0 collections: 58
-Gen1 collections: 0
-Gen2 collections: 0
-Total allocated bytes: 146,00 MB
-```
-
-**Запишите в таблицу:** те же метрики, что и на шаге 2. `GCSettings.IsServerGC` должно быть `True`.
-
-#### Способ Б — через переменную окружения (без изменения .csproj)
-
-Если не хотите править `.csproj`, выполните в том же окне терминала:
-
-```powershell
-$env:DOTNET_gcServer=1
-dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
-```
-
-После этого переменная окружения действует только в текущем сеансе терминала. Чтобы вернуть Workstation GC, закройте терминал или выполните `$env:DOTNET_gcServer=0`.
-
-**Важно:** если используете этот способ, укажите в отчёте обе команды:
-```powershell
-$env:DOTNET_gcServer=1
-dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
-```
-
----
-
-### Шаг 4. Проверка в трёх условиях компьютера
-
-Повторите **Шаг 2** и **Шаг 3** в каждом из следующих сценариев:
-
-| Сценарий | Что сделать перед запуском |
-|----------|---------------------------|
-| **1. ПК в простое** | Закройте браузер, мессенджеры и другие тяжелые приложения. Оставьте только терминал. |
-| **2. Браузер запущен** | Откройте браузер с несколькими вкладками. Не закрывайте его во время замеров. |
-| **3. Браузер + 4K видео** | Запустите браузер и включите воспроизведение видео в 4K (YouTube и т.п.) на фоне. |
-
-**Для каждого сценария запишите:**
-
-| Режим GC | Время (мс) | Gen0 | Gen1 | Gen2 | Аллокации (МБ) | IsServerGC |
-|----------|-----------|------|------|------|----------------|------------|
-| Workstation | | | | | | False |
-| Server | | | | | | True |
-
-**Что вы должны увидеть в результатах:**
-
-- `GCSettings.IsServerGC` = `False` для Workstation GC и `True` для Server GC — это главное доказательство, что режим действительно изменился.
-- Gen0 у Server GC существенно выше (примерно 58 против 16 при 4 потоках и 12 ядрах) — **это нормально, не ошибка**.
-- Gen1 и Gen2 остаются `0` в обоих режимах.
-- Аллокации одинаковы (примерно 146 МБ) — число потоков и объектов не менялось, сравнение корректно.
-- Время выполнения примерно сопоставимо (Server GC может быть чуть быстрее или на том же уровне).
-
----
-
-### Шаг 5. Интерпретация результата: почему Server GC показывает больше Gen0
+### Шаг 3. Интерпретация результата: почему Server GC показывает больше Gen0
 
 Это не ошибка, а особенность работы Server GC:
 
@@ -311,33 +167,6 @@ dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
 Когда 4 потока одновременно создают `new byte[100]`, объекты распределяются по разным кучам. Каждая куча заполняет свой Gen0 быстрее, чем одна общая куча в Workstation GC. Поэтому суммарное число Gen0-сборок у Server GC выше (58 против 16).
 
 Это ожидаемое поведение: Server GC оптимизирован для **пропускной способности (throughput)** на многопроцессорных системах, а не для минимального числа отдельных сборок.
-
----
-
-### Шпаргалка: команды для копирования
-
-**Сборка:**
-```powershell
-dotnet build src/MemoryLifecycle/MemoryLifecycle.csproj -c Release
-```
-
-**Workstation GC:**
-```powershell
-dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
-```
-
-**Server GC через .csproj** (после добавления `<ServerGarbageCollection>true</ServerGarbageCollection>` и сохранения файла):
-```powershell
-dotnet build src/MemoryLifecycle/MemoryLifecycle.csproj -c Release
-dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
-```
-
-**Server GC через переменную окружения:**
-```powershell
-$env:DOTNET_gcServer=1
-dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
-```
-
 
 ---
 
@@ -393,25 +222,6 @@ dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-modes
 | 2 | True | 11 | 58 | 0 | 0 | 146,00 |
 | 3 | True | 13 | 58 | 0 | 0 | 146,00 |
 
-### Почему результаты могут различаться (внимание к типичным ошибкам)
-
-- **Workstation GC** использует **одну общую кучу**. У Server GC **несколько куч** — обычно по одной на логический процессор, каждая со своим Gen0. Поэтому у Server GC больше Gen0-сборок — это не ошибка, а особенность архитектуры с несколькими кучами.
-- **Не делайте вывод о деградации** только из-за большего числа Gen0 у Server GC.
-- **Число потоков (4) и объектов (300 000 на поток) должно быть одинаковым** в обоих запусках, иначе сравнение недействительно.
-- **Запуск должен быть в конфигурации Release без отладчика.** Сравнение в Debug или с подключённым отладчиком некорректно.
-- **Недостаточно одного запуска.** Необходимо минимум 2–3 запуска для оценки стабильности, а также учитывать прогрев (warm-up) и фоновую нагрузку на ПК.
-- **Обязательно выводите `GCSettings.IsServerGC`** в обоих режимах — иначе невозможно доказать, что режим действительно изменился.
-- **Время измеряется через `Stopwatch`**, а не субъективными ощущениями.
-
----
-
-## Реализация (соответствует методичке КТ №40, раздел 3.2)
-
-- `Gc/GcSnapshot.cs` — `readonly record struct GcSnapshot` с `Capture()` и `Diff()`, использует `GC.GetTotalAllocatedBytes(precise: true)` и `GC.GetGCMemoryInfo().HeapSizeBytes`
-- `Gc/GcObserver.cs` — `GcObserver.PrintMemoryInfo(string label)` для вывода состояния кучи
-- `Gc/PressureScenarios.cs` — четыре сценария: `RunSmallObjects`, `RunLargeObjects`, `RunLongLived`, `RunForcedGen2`
-- `Gc/GcModeScenarios.cs` — сценарии для КТ №41 (Workstation vs Server GC)
-- `src/MemoryLifecycle/Program.cs` — команды `gc-pressure` и `gc-modes`, GC-бенчмарк Workstation vs Server GC
 
 Отчёт: `docs/01-gc.md`
 
