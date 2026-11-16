@@ -272,3 +272,98 @@ dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-modes
 ```
 
 Отчёт: `docs/03-disposable.md`
+
+---
+
+## КТ №43. Паттерн Dispose. IAsyncDisposable (.NET 10)
+
+Для этапа КТ №43 добавлены:
+
+- `Resources/DatabaseConnection.cs` — вариант 1: `sealed class : IDisposable, IAsyncDisposable` с управляемым ресурсом `List<string>` (журнал запросов) и нативным `int connectionId`
+- `Resources/FileBuffer.cs` — вариант 2: `sealed class : IDisposable, IAsyncDisposable` с управляемым ресурсом `MemoryStream` и нативным `int fileHandle`
+- Полный паттерн Dispose: `Dispose()` → `Dispose(bool disposing)` → finiilazer `~Class()` → `DisposeAsync()` → `DisposeAsyncCore()`
+- `GC.SuppressFinalize(this)` в `Dispose()` и `DisposeAsync()`
+- Команды `dispose-v1` и `dispose-v2` в `Program.cs`
+- Отчёт: `docs/04-dispose-pattern.md`
+
+### Команда запуска
+
+Соберите проект в Release и запускайте без отладчика:
+
+```powershell
+dotnet build src/MemoryLifecycle/MemoryLifecycle.csproj -c Release
+```
+
+**Вариант 1 — DatabaseConnection:**
+
+```powershell
+dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll dispose-v1
+```
+
+**Ожидаемый результат:**
+
+```
+=== Вариант 1: DatabaseConnection (IDisposable, IAsyncDisposable) ===
+
+1. Синхронный using
+[DatabaseConnection 1] соединение открыто
+[DatabaseConnection 1] запрос: SELECT * FROM Students
+[DatabaseConnection 1] журнал запросов очищен
+[DatabaseConnection 1] соединение закрыто
+
+2. Асинхронный await using
+[DatabaseConnection 2] соединение открыто
+[DatabaseConnection 2] запрос: SELECT * FROM Topics
+[DatabaseConnection 2] журнал запросов очищен асинхронно
+[DatabaseConnection 2] соединение закрыто
+
+3. Проверка GC.SuppressFinalize после using
+[DatabaseConnection 3] соединение открыто
+[DatabaseConnection 3] запрос: SELECT 1
+[DatabaseConnection 3] журнал запросов очищен
+[DatabaseConnection 3] соединение закрыто
+После сборки: сообщение финализатора отсутствует
+
+4. Финализатор без Dispose
+[DatabaseConnection 4] соединение открыто
+[DatabaseConnection 4] запрос: UPDATE Students SET Name = 'Test'
+[DatabaseConnection 4] соединение закрыто
+После сборки: финализатор освободил только нативный ресурс
+```
+
+**Вариант 2 — FileBuffer:**
+
+```powershell
+dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll dispose-v2
+```
+
+**Ожидаемый результат:**
+
+```
+=== Вариант 2: FileBuffer (IDisposable, IAsyncDisposable) ===
+
+1. Синхронный using
+[FileBuffer 1] буфер открыт
+[FileBuffer 1] буфер освобождён
+[FileBuffer 1] дескриптор 1 закрыт
+
+2. Асинхронный await using
+[FileBuffer 2] буфер открыт
+[FileBuffer 2] буфер освобождён асинхронно
+[FileBuffer 2] дескриптор 2 закрыт
+
+3. Проверка GC.SuppressFinalize после using
+[FileBuffer 3] буфер открыт
+[FileBuffer 3] буфер освобождён
+[FileBuffer 3] дескриптор 3 закрыт
+После сборки: сообщение финализатора отсутствует
+
+4. Финализатор без Dispose
+[FileBuffer 4] буфер открыт
+[FileBuffer 4] дескриптор 4 закрыт
+После сборки: финализатор освободил только нативный ресурс
+```
+
+![Скриншот консоли — варианты 1 и 2 КТ №43](docs/2026-11-16_19-02-00.png)
+
+Отчёт: `docs/04-dispose-pattern.md`

@@ -29,13 +29,23 @@ class Program
         {
             ResourceDemos.RunAll();
         }
+        else if (args.Length > 0 && args[0] == "dispose-v1")
+        {
+            await RunDisposeVariant1Async();
+        }
+        else if (args.Length > 0 && args[0] == "dispose-v2")
+        {
+            await RunDisposeVariant2Async();
+        }
         else
         {
             Console.WriteLine("Hello, World!");
             Console.WriteLine("Доступные команды:");
-            Console.WriteLine("  gc-pressure —бенчмарк давления на кучу (Workstation vs Server GC)");
-            Console.WriteLine("  gc-modes    — сценарии работы с режимами GC");
-            Console.WriteLine("  dispose     — примеры IDisposable и финализаторов");
+            Console.WriteLine("  gc-pressure    —бенчмарк давления на кучу (Workstation vs Server GC)");
+            Console.WriteLine("  gc-modes       — сценарии работы с режимами GC");
+            Console.WriteLine("  dispose        — примеры IDisposable и финализаторов");
+            Console.WriteLine("  dispose-v1     — вариант 1: DatabaseConnection (IDisposable, IAsyncDisposable)");
+            Console.WriteLine("  dispose-v2     — вариант 2: FileBuffer (IDisposable, IAsyncDisposable)");
         }
     }
 
@@ -96,5 +106,91 @@ class Program
         Console.WriteLine($"Gen2 collections: {gen2After - gen2Before}");
         Console.WriteLine($"Total allocated bytes: {(allocatedBytesAfter - allocatedBytesBefore) / 1024 / 1024:N2} MB");
         Console.WriteLine();
+    }
+
+    static async Task RunDisposeVariant1Async()
+    {
+        Console.WriteLine("=== Вариант 1: DatabaseConnection (IDisposable, IAsyncDisposable) ===");
+
+        Console.WriteLine();
+        Console.WriteLine("1. Синхронный using");
+        using (var connection = new DatabaseConnection())
+        {
+            connection.Execute("SELECT * FROM Students");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("2. Асинхронный await using");
+        await using (var connection = new DatabaseConnection())
+        {
+            connection.Execute("SELECT * FROM Topics");
+            await Task.Delay(1);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("3. Проверка GC.SuppressFinalize после using");
+        using (var connection = new DatabaseConnection())
+        {
+            connection.Execute("SELECT 1");
+        }
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        Console.WriteLine("После сборки: сообщение финализатора отсутствует");
+
+        Console.WriteLine();
+        Console.WriteLine("4. Финализатор без Dispose");
+        CreateDatabaseConnectionWithoutDispose();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        Console.WriteLine("После сборки: финализатор освободил только нативный ресурс");
+    }
+
+    static void CreateDatabaseConnectionWithoutDispose()
+    {
+        var connection = new DatabaseConnection();
+        connection.Execute("UPDATE Students SET Name = 'Test'");
+    }
+
+    static async Task RunDisposeVariant2Async()
+    {
+        Console.WriteLine("=== Вариант 2: FileBuffer (IDisposable, IAsyncDisposable) ===");
+
+        Console.WriteLine();
+        Console.WriteLine("1. Синхронный using");
+        using (var buffer = new FileBuffer())
+        {
+            buffer.Write(new byte[] { 1, 2, 3, 4 });
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("2. Асинхронный await using");
+        await using (var buffer = new FileBuffer())
+        {
+            buffer.Write(new byte[] { 5, 6, 7 });
+            await Task.Delay(1);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("3. Проверка GC.SuppressFinalize после using");
+        using (var buffer = new FileBuffer())
+        {
+            buffer.Write(new byte[] { 8, 9 });
+        }
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        Console.WriteLine("После сборки: сообщение финализатора отсутствует");
+
+        Console.WriteLine();
+        Console.WriteLine("4. Финализатор без Dispose");
+        CreateFileBufferWithoutDispose();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        Console.WriteLine("После сборки: финализатор освободил только нативный ресурс");
+    }
+
+    static void CreateFileBufferWithoutDispose()
+    {
+        var buffer = new FileBuffer();
+        buffer.Write(new byte[] { 10, 11 });
     }
 }
