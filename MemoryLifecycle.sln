@@ -18,6 +18,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Элементы решения", "Элементы решения", "{754FC069-D67B-A9D7-50A1-8D1CA196D8F1}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
+		docs\01-gc.md = docs\01-gc.md
+		docs\02-gc-modes.md = docs\02-gc-modes.md
+		docs\03-disposable.md = docs\03-disposable.md
+		docs\04-dispose-pattern.md = docs\04-dispose-pattern.md
 		README.md = README.md
 	EndProjectSection
 EndProject
