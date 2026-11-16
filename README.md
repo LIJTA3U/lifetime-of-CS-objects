@@ -225,3 +225,50 @@ dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-modes
 
 Отчёт: `docs/01-gc.md`
 
+---
+
+## КТ №42. Финализируемые объекты. IDisposable. using
+
+Для этапа КТ №42 добавлены:
+
+- `Resources/FakeResource.cs` — класс с финализатором (`~FakeResource`), без `IDisposable`
+- `Resources/ManagedResource.cs` — `sealed class : IDisposable` с флагом `disposed` и свойством `IsDisposed`
+- `Resources/LogFile.cs` — `sealed class : IDisposable` с `StreamWriter`, `GC.SuppressFinalize(this)` и финализатором
+- `Demos/ResourceDemos.cs` — четыре демо-сценария: финализатор, `using`, забытый `Dispose`, `LogFile` с `using`
+- Команда `dispose` в `Program.cs`
+- Статья `docs/03-disposable.md`
+
+### Ожидаемый результат
+
+```
+1. Финализатор: объект создаётся без ссылки
+[FakeResource 1] создан
+[FakeResource 2] создан
+Принудительный GC, финализатор должен сработать
+[FakeResource 1] финализирован
+[FakeResource 2] финализирован
+После GC.Collect + WaitForPendingFinalizers
+
+2. using: детерминированное Dispose
+[ManagedResource 1] создан
+Внутри using-блока
+[ManagedResource 1] Dispose вызван
+После выхода из using-блока
+
+3. Забытый Dispose: объект не освобождается
+[ManagedResource 2] создан
+Объект создан, IsDisposed = False
+Принудительный GC, Dispose не был вызван
+После Dispose (FINALIZER не вызван, т.к. нет финализатора)
+
+4. LogFile: запись в файл через using
+[LogFile 1] файл открыт: ...
+[LogFile 1] файл закрыт
+После выхода из using-блока
+[LogFile 2] файл открыт: ...
+Создан LogFile без Dispose
+[LogFile 2] финализатор! - файл не был закрыт Dispose()
+После Dispose: финализатор сработал
+```
+
+Отчёт: `docs/03-disposable.md`

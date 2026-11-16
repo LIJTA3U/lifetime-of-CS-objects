@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime;
 using System.Threading.Tasks;
 using MemoryLifecycle.Gc;
+using MemoryLifecycle.Resources;
+using MemoryLifecycle.Demos;
 
 namespace MemoryLifecycle;
 
@@ -22,12 +25,17 @@ class Program
         {
             GcModeScenarios.RunAll();
         }
+        else if (args.Length > 0 && args[0] == "dispose")
+        {
+            ResourceDemos.RunAll();
+        }
         else
         {
             Console.WriteLine("Hello, World!");
             Console.WriteLine("Доступные команды:");
-            Console.WriteLine("  gc-pressure —ベンчмарк давления на кучу (Workstation vs Server GC)");
+            Console.WriteLine("  gc-pressure —бенчмарк давления на кучу (Workstation vs Server GC)");
             Console.WriteLine("  gc-modes    — сценарии работы с режимами GC");
+            Console.WriteLine("  dispose     — примеры IDisposable и финализаторов");
         }
     }
 
