@@ -138,26 +138,7 @@ dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll
 
 ---
 
-### Шаг 1. Сборка проекта в Release
-
-Выполните в терминале:
-
-```powershell
-dotnet build src/MemoryLifecycle/MemoryLifecycle.csproj -c Release
-```
-
-**Что должно произойти:** сборка завершится без ошибок, в консоли появится строка `Сборка успешно завершена. Предупреждений: 0, Ошибок: 0`.
-
-Скомпилированный файл появится по пути:
-`src\MemoryLifecycle\bin\Release\net9.0\MemoryLifecycle.dll`
-
----
-
-### Шаг 2. Запуск в режиме Workstation GC (по умолчанию)
-
----
-
-### Шаг 3. Интерпретация результата: почему Server GC показывает больше Gen0
+### Интерпретация результата: почему Server GC показывает больше Gen0
 
 Это не ошибка, а особенность работы Server GC:
 
