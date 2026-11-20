@@ -170,6 +170,10 @@ dotnet build src/MemoryLifecycle/MemoryLifecycle.csproj -c Release
 
 ---
 
+![Скриншот КТ №40 — вывод gc-pressure](docs/screenshots/kt40.png)
+
+---
+
 ## КТ №41. Workstation и Server GC
 
 Для этапа КТ №41 добавлены:
@@ -227,6 +231,10 @@ dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-modes
 
 ---
 
+![Скриншот КТ №41 — вывод gc-modes](docs/screenshots/kt41.png)
+
+---
+
 ## КТ №42. Финализируемые объекты. IDisposable. using
 
 Для этапа КТ №42 добавлены:
@@ -272,6 +280,10 @@ dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-modes
 ```
 
 Отчёт: `docs/03-disposable.md`
+
+---
+
+![Скриншот КТ №42 — вывод dispose](docs/screenshots/kt42.png)
 
 ---
 
