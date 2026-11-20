@@ -367,3 +367,208 @@ dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll dispose-v2
 ![Скриншот консоли — варианты 1 и 2 КТ №43](docs/2026-11-16_19-02-00.png)
 
 Отчёт: `docs/04-dispose-pattern.md`
+
+---
+
+## 8. Контрольные вопросы
+
+### 1. Какой режим GC используется по умолчанию и как проверить, что режим действительно изменился?
+
+**Ответ:**
+
+По умолчанию проект использует **Workstation GC**. Проверить, что режим действительно изменился, можно выводом `GCSettings.IsServerGC`:
+
+```csharp
+Console.WriteLine($"GCSettings.IsServerGC = {GCSettings.IsServerGC}");
+```
+
+- `False` — Workstation GC
+- `True` — Server GC
+
+Этот вывод присутствует в обеих командах бенчмарка (`gc-pressure` и `gc-modes`) и служит доказательством текущего режима.
+
+---
+
+### 2. Почему Server GC показывает больше Gen0-коллекций (58 против 16) — это ошибка?
+
+**Ответ:**
+
+Это **не ошибка, а особенность архитектуры Server GC**. Server GC использует несколько куч — по одной на логический процессор (12 ядер = до 12 куч). У каждой кучи своё собственное поколение Gen0. Когда 4 потока одновременно создают объекты, они распределяются по разным кучам, и каждая Gen0 заполняется быстрее, чем одна общая куча в Workstation GC. Поэтому суммарное число Gen0-сборок у Server GC выше — это ожидаемое поведение, оптимизированное для пропускной способность (throughput).
+
+---
+
+### 3. Что нужно сделать, чтобы сравнение Workstation и Server GC было корректным?
+
+**Ответ:**
+
+Для корректного сравнения нужно:
+
+1. Собрать в **Release** и запускать **без отладчика** (`dotnet build ... -c Release`).
+2. Использовать **одинаковое число потоков (4) и объектов (300 000 на поток)** в обоих режимах.
+3. Сделать **2–3 запуска в каждом режиме**, не один.
+4. Учесть **прогрев** (warm-up — forced Gen2 сборка в коде бенчмарка).
+5. Учесть **фоновую нагрузку** на ПК (браузер, 4K видео).
+6. Не делать вывод о деградации из-за большего числа Gen0 у Server GC — объяснить различие через несколько куч.
+7. Выводить **`GCSettings.IsServerGC`** в обоих режимах как доказательство изменения режима.
+8. Измерять время через **`Stopwatch`**, а не субъективными ощущениями.
+
+---
+
+### 4. Какой результат показывает бенчмарк в обоих режимах и какой вывод из этого следует?
+
+**Ответ:**
+
+- **Workstation GC:** `GCSettings.IsServerGC = False`, Gen0 ≈ 16, Gen1 = 0, Gen2 = 0, время ~10–13 мс, аллокации 146 МБ.
+- **Server GC:** `GCSettings.IsServerGC = True`, Gen0 ≈ 58, Gen1 = 0, Gen2 = 0, время ~12–13 мс, аллокации 146 МБ.
+
+**Вывод:**
+
+- Аллокации одинаковы, число потоков одинаково — сравнение корректно.
+- Gen0 у Server GC выше из-за нескольких куч — это ожидаемо.
+- Время выполнения практически идентично при 4 потоках; Server GC при большем числе потоков и серверной нагрузке обычно выигрывает за счёт параллельных сборок по нескольким кучам.
+- Server GC подходит для многопроцессорных серверных систем и пропускной способности.
+
+---
+
+### 5. Какие режимы переключения Server GC показаны в README и какой принцип выбрать для проекта?
+
+**Ответ:**
+
+Показаны два способа:
+
+1. **Через `.csproj`:**
+   ```xml
+   <ServerGarbageCollection>true</ServerGarbageCollection>
+   ```
+   — подходит, когда проект самодостаточен и нужно переключение по умолчанию.
+
+2. **Через переменную окружения:**
+   ```powershell
+   $env:DOTNET_gcServer=1
+   ```
+   — подходит для тестовых запусков, отладки и временных переключений без изменения кода.
+
+**Принцип выбора:** для серверного приложения (ASP.NET Core, микросервисы) Server GC по умолчанию — повышает пропускную способность. Для клиентских приложений, UI, инструменты — Workstation GC по умолчанию — снижает паузы и чувствительнее к интерактивности. Для измерений и сравнений удобнее использовать переменную окружения.
+
+---
+
+### 6. Какие объекты попадают в LOH и когда Gen2-счётчик увеличивается реально?
+
+**Ответ (по КТ №40):**
+
+- Массивы размером **более 85 КБ** попадают в **LOH** (Large Object Heap).
+- Объекты в LOH не инициируют сборку Gen0 и не обязательно увеличивают счётчик Gen2 сразу — Gen2-счётчик увеличивается **только при фактической сборке Gen2**, а не при каждой крупной аллокации.
+
+---
+
+### 7. Какие ошибки возникают при сравнении Workstation и Server GC (типичные ошибки)?
+
+**Ответ (согласно КТ №41, раздел 4.3.5):**
+
+- Сравнение выполняется в конфигурации Debug или с подключённым отладчиком.
+- Один запуск объявляется достаточным доказательством; не учитываются прогрев и фоновая нагрузка.
+- В Server GC больше Gen0, и студент делает вывод о деградации, не объясняя разницу в количестве куч.
+- В двух запусках разное число потоков или объектов, поэтому сравнение недействительно.
+- Не выводится `GCSettings.IsServerGC`, и невозможно доказать, что режим действительно изменился.
+- Время измеряется без `Stopwatch`, по субъективному ощущению.
+
+---
+
+### 8. Какая структура проекта должна быть на ПК в данный момент и почему `Demos` вынесена на уровень `src/Demos`?
+
+**Ответ:**
+
+Текущая структура (соответствует скриншоту 2):
+
+```
+MemoryLifecycle/
+├── MemoryLifecycle.sln
+├── README.md
+├── docs/
+│   ├── 01-gc.md
+│   ├── 02-gc-modes.md
+│   ├── 02-gcmodes.md
+│   ├── 03-disposable.md
+│   └── 04-dispose-pattern.md
+└── src/
+    ├── Demos/
+    │   ├── DisposeDemos.cs
+    │   └── ResourceDemos.cs
+    └── MemoryLifecycle/
+        ├── MemoryLifecycle.csproj
+        ├── Program.cs
+        ├── Gc/
+        │   ├── GcSnapshot.cs
+        │   ├── GcObserver.cs
+        │   ├── PressureScenarios.cs
+        │   └── GcModeScenarios.cs
+        └── Resources/
+            ├── FakeResource.cs
+            ├── ManagedResource.cs
+            ├── LogFile.cs
+            ├── DatabaseConnection.cs
+            └── FileBuffer.cs
+```
+
+**Почему `Demos` на уровне `src/Demos`:**
+
+Требование 4.4 для КТ №41 гласит, что в проект добавляется файл `Gc/GcModeScenarios.cs`. Файлы демонстраций (`DisposeDemos.cs`, `ResourceDemos.cs`) были перемещены из `src/MemoryLifecycle/Demos/` в `src/Demos/` при исправлении структуры проекта (скриншот 2), чтобы Démо файлы не были внутри папки проекта `MemoryLifecycle`, а находились на уровне решения `src/`, параллельно с проектом. Это улучшает организацию решения: `src/` содержит все демонстрационные файлы и сам проект.
+
+**Примечание по именам:**
+
+- Файл `src/MemoryLifecycle/Resources/logfile.cs` переименован в `LogFile.cs` (с большой буквы) по соглашению именования C# файлов.
+- В папке `Gc` оба файла присутствуют: `GcModeScenarios.cs` (для КТ №41) и `PressureScenarios.cs` (для КТ №40).
+
+---
+
+### 9. Как выглядит вывод бенчмарка в режиме Workstation GC и Server GC?
+
+**Ответ:**
+
+Вывод бенчмарка `gc-pressure`:
+
+```
+=== GC Benchmark: Workstation vs Server GC ===
+GCSettings.IsServerGC = False
+Processor count: 12
+Threads: 4
+Objects per thread: 300,000
+Object size: 100 bytes
+Total allocated (approx): 114,44 MB
+
+=== Results ===
+GCSettings.IsServerGC = False
+Elapsed time: 10 ms
+Gen0 collections: 16
+Gen1 collections: 0
+Gen2 collections: 0
+Total allocated bytes: 146,00 MB
+```
+
+Для Server GC: `GCSettings.IsServerGC = True`, Gen0 = 58, остальные значения аналогичны.
+
+Команды запуска:
+
+```powershell
+# Workstation GC
+dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-pressure
+
+# Server GC
+$env:DOTNET_gcServer=1
+dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-pressure
+```
+
+---
+
+### 10. Какие команды доступны в проекте после КТ №41?
+
+**Ответ:**
+
+- `dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-pressure` — BENCHMARK Workstation vs Server GC (КТ №40)
+- `dotnet src/MemoryLifecycle/bin/Release/net9.0/MemoryLifecycle.dll gc-modes` — сценарии работы с режимами GC (КТ №41)
+
+Соберите в Release перед запуском:
+
+```powershell
+dotnet build src/MemoryLifecycle/MemoryLifecycle.csproj -c Release
+```
